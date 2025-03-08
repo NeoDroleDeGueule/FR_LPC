@@ -1,12 +1,12 @@
 services:
   - type: web
-    name: phonetique-fr
+    name: FR_LPC
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10.0
+        value: 3.9.12
       - key: FLASK_ENV
         value: production
       - key: FLASK_DEBUG

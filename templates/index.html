@@ -3,82 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transcription Phonétique</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Transcription Phonétique LPC</title>
     <style>
         body {
-            background-color: #f8f9fa;
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
             padding: 20px;
         }
         .container {
             max-width: 800px;
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            margin: 0 auto;
         }
-        .result-box {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result-group {
+            margin-top: 20px;
             padding: 15px;
-            margin-top: 15px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
         }
-        .phonetic {
+        .result-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        #resultat, #paires {
             font-family: 'Arial Unicode MS', 'Lucida Sans Unicode', sans-serif;
-            color: #2c3e50;
-            font-size: 1.2em;
+            font-size: 18px;
+            line-height: 1.8;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            min-height: 50px;
+        }
+        .paire-phoneme {
+            display: inline-block;
+            padding: 2px 8px;
+            margin: 2px;
+            background-color: #e9ecef;
+            border-radius: 3px;
+            font-family: monospace;
+            margin-right: 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="mb-4 text-center">Transcription Phonétique</h1>
+        <h1>Transcription Phonétique LPC</h1>
         
-        <div class="card">
-            <div class="card-body">
-                <div class="mb-3">
-                    <label for="texte" class="form-label">Texte à transcrire :</label>
-                    <textarea id="texte" class="form-control" rows="5" placeholder="Entrez votre texte ici..."></textarea>
-                </div>
-                <div class="d-grid gap-2">
-                    <button onclick="transcrire()" class="btn btn-primary">Transcrire</button>
-                </div>
-                <div id="resultat-direct" class="result-box phonetic d-none"></div>
-            </div>
+        <div class="input-group">
+            <textarea id="texte" placeholder="Entrez votre texte ici..."></textarea>
+            <button onclick="transcrire()">Transcrire</button>
+        </div>
+
+        <div class="result-group">
+            <div class="result-label">Transcription phonétique :</div>
+            <div id="resultat"></div>
+        </div>
+
+        <div class="result-group">
+            <div class="result-label">Paires Consonne/Voyelle :</div>
+            <div id="paires"></div>
         </div>
     </div>
 
     <script>
-        async function transcrire() {
-            const texte = document.getElementById('texte').value;
-            const resultat = document.getElementById('resultat-direct');
-            
-            if (!texte.trim()) {
-                resultat.textContent = "Veuillez entrer du texte à transcrire";
-                resultat.classList.remove('d-none');
+        function transcrire() {
+            const texte = document.getElementById('texte').value.trim();
+            if (!texte) {
+                alert('Veuillez entrer du texte à transcrire.');
                 return;
             }
-            
-            try {
-                const response = await fetch('/api/transcrire', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ texte })
+
+            // Afficher un message de chargement
+            const resultatDiv = document.getElementById('resultat');
+            const pairesDiv = document.getElementById('paires');
+            resultatDiv.textContent = 'Chargement...';
+            pairesDiv.innerHTML = 'Chargement...';
+
+            console.log('Envoi de la requête :', texte);
+
+            fetch('/api/transcrire', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ texte: texte })
+            })
+            .then(response => {
+                console.log('Statut de la réponse:', response.status);
+                return response.json().then(data => {
+                    if (!response.ok) {
+                        throw new Error(data.error || `Erreur HTTP ${response.status}`);
+                    }
+                    return data;
                 });
-                const data = await response.json();
+            })
+            .then(data => {
+                console.log('Données reçues:', data);
                 
-                resultat.textContent = data.transcription;
-                resultat.classList.remove('d-none');
-            } catch (error) {
-                resultat.textContent = `Erreur: ${error.message}`;
-                resultat.classList.remove('d-none');
-            }
+                if (data.transcription) {
+                    resultatDiv.textContent = data.transcription;
+                } else {
+                    resultatDiv.textContent = 'Aucune transcription disponible';
+                }
+
+                if (data.paires && data.paires.length > 0) {
+                    pairesDiv.innerHTML = data.paires
+                        .map(paire => `<span class="paire-phoneme">${paire}</span>`)
+                        .join(' ');
+                } else {
+                    pairesDiv.innerHTML = 'Aucune paire disponible';
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                resultatDiv.textContent = 'Erreur: ' + error.message;
+                pairesDiv.innerHTML = 'Erreur lors de la transcription';
+            });
         }
 
-        // Ajouter la possibilité de transcrire en appuyant sur Entrée
+        // Permettre la transcription avec Ctrl+Enter
         document.getElementById('texte').addEventListener('keydown', function(e) {
             if (e.ctrlKey && e.key === 'Enter') {
                 transcrire();
