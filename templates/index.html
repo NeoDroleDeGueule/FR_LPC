@@ -55,7 +55,7 @@
             margin-bottom: 5px;
             color: #333;
         }
-        #resultat, #paires {
+        #resultat, #phonemes, #syllabes {
             font-family: 'Arial Unicode MS', 'Lucida Sans Unicode', sans-serif;
             font-size: 18px;
             line-height: 1.8;
@@ -65,7 +65,7 @@
             border-radius: 4px;
             min-height: 50px;
         }
-        .paire-phoneme {
+        .phoneme {
             display: inline-block;
             padding: 2px 8px;
             margin: 2px;
@@ -91,65 +91,95 @@
         </div>
 
         <div class="result-group">
-            <div class="result-label">Paires Consonne/Voyelle :</div>
-            <div id="paires"></div>
+            <div class="result-label">Phonèmes :</div>
+            <div id="phonemes"></div>
+        </div>
+
+        <div class="result-group">
+            <div class="result-label">Syllabes :</div>
+            <div id="syllabes"></div>
         </div>
     </div>
 
     <script>
-        function transcrire() {
-            const texte = document.getElementById('texte').value.trim();
+        async function transcrireTexte() {
+            const texte = document.getElementById('texte').value;
+            const resultat = document.getElementById('resultat');
+            const phonemes = document.getElementById('phonemes');
+            const syllabes = document.getElementById('syllabes');
+            
             if (!texte) {
-                alert('Veuillez entrer du texte à transcrire.');
+                alert('Veuillez entrer un texte à transcrire');
                 return;
             }
 
-            // Afficher un message de chargement
-            const resultatDiv = document.getElementById('resultat');
-            const pairesDiv = document.getElementById('paires');
-            resultatDiv.textContent = 'Chargement...';
-            pairesDiv.innerHTML = 'Chargement...';
-
-            console.log('Envoi de la requête :', texte);
-
-            fetch('/api/transcrire', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ texte: texte })
-            })
-            .then(response => {
-                console.log('Statut de la réponse:', response.status);
-                return response.json().then(data => {
-                    if (!response.ok) {
-                        throw new Error(data.error || `Erreur HTTP ${response.status}`);
-                    }
-                    return data;
-                });
-            })
-            .then(data => {
-                console.log('Données reçues:', data);
+            try {
+                // Réinitialiser l'affichage
+                resultat.innerHTML = 'Transcription en cours...';
+                phonemes.innerHTML = '';
+                syllabes.innerHTML = '';
                 
-                if (data.transcription) {
-                    resultatDiv.textContent = data.transcription;
-                } else {
-                    resultatDiv.textContent = 'Aucune transcription disponible';
+                console.log('Envoi de la requête pour:', texte);
+                
+                const response = await fetch('/transcrire', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ texte: texte })
+                });
+
+                console.log('Statut de la réponse:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
                 }
 
-                if (data.paires && data.paires.length > 0) {
-                    pairesDiv.innerHTML = data.paires
-                        .map(paire => `<span class="paire-phoneme">${paire}</span>`)
-                        .join(' ');
-                } else {
-                    pairesDiv.innerHTML = 'Aucune paire disponible';
+                const jsonData = await response.json();
+                console.log('Données reçues:', jsonData);
+                
+                if (!jsonData.transcription) {
+                    throw new Error('Pas de transcription dans la réponse');
                 }
-            })
-            .catch(error => {
-                console.error('Erreur:', error);
-                resultatDiv.textContent = 'Erreur: ' + error.message;
-                pairesDiv.innerHTML = 'Erreur lors de la transcription';
-            });
+
+                // Afficher la transcription
+                resultat.innerHTML = `<div style="font-size: 1.2em; font-family: 'Arial Unicode MS', 'Lucida Sans Unicode', sans-serif;">${jsonData.transcription}</div>`;
+                console.log('Transcription affichée:', jsonData.transcription);
+                
+                // Afficher les phonèmes
+                if (jsonData.phonemes && jsonData.phonemes.length > 0) {
+                    const phonemesHtml = jsonData.phonemes
+                        .map(phoneme => `<span class="phoneme" style="display: inline-block; padding: 2px 8px; margin: 2px; background-color: #e9ecef; border-radius: 3px; font-family: 'Arial Unicode MS', 'Lucida Sans Unicode', sans-serif;">${phoneme}</span>`)
+                        .join(' ');
+                    phonemes.innerHTML = phonemesHtml;
+                    console.log('Phonèmes affichés:', jsonData.phonemes);
+                } else {
+                    phonemes.innerHTML = '<span style="color: #666;">Aucun phonème disponible</span>';
+                    console.log('Aucun phonème disponible');
+                }
+                
+                // Afficher les syllabes
+                if (jsonData.syllabes && jsonData.syllabes.length > 0) {
+                    const syllabesHtml = jsonData.syllabes
+                        .map(syllabe => `<span class="phoneme" style="display: inline-block; padding: 2px 8px; margin: 2px; background-color: #e9ecef; border-radius: 3px; font-family: 'Arial Unicode MS', 'Lucida Sans Unicode', sans-serif;">${syllabe}</span>`)
+                        .join(' ');
+                    syllabes.innerHTML = syllabesHtml;
+                    console.log('Syllabes affichées:', jsonData.syllabes);
+                } else {
+                    syllabes.innerHTML = '<span style="color: #666;">Aucune syllabe disponible</span>';
+                    console.log('Aucune syllabe disponible');
+                }
+                
+            } catch (error) {
+                console.error('Erreur détaillée:', error);
+                resultat.innerHTML = `<span style="color: red;">Erreur: ${error.message}</span>`;
+                phonemes.innerHTML = '';
+                syllabes.innerHTML = '';
+            }
+        }
+
+        function transcrire() {
+            transcrireTexte();
         }
 
         // Permettre la transcription avec Ctrl+Enter

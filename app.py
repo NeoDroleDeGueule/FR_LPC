@@ -4,12 +4,35 @@ import os
 import tempfile
 import requests
 import re
+import logging
+import json
+from pocketsphinx import Config, Decoder, get_model_path, Pocketsphinx
 
 app = Flask(__name__)
 
+# Configuration Azure
+SPEECH_KEY = os.getenv('AZURE_SPEECH_KEY')
+SPEECH_REGION = os.getenv('AZURE_SPEECH_REGION', 'francecentral')
+
+# Configuration de PocketSphinx
+SPHINX_CONFIG = {
+    'hmm': os.path.join(get_model_path(), 'fr-fr'),  # Modèle acoustique français
+    'dict': os.path.join(get_model_path(), 'fr-fr.dict'),  # Dictionnaire de prononciation
+    'allphone': os.path.join(get_model_path(), 'fr-fr.phone'),  # Liste des phonèmes
+    'beam': 1e-20,  # Paramètre de recherche
+    'pbeam': 1e-20,  # Paramètre de recherche phonétique
+    'lw': 2.0,  # Poids du modèle de langage
+}
+
 # Dictionnaire de correspondances phonétiques amélioré
 PHONEMES = {
-    # Voyelles composées (à traiter en premier)
+    # Cas spéciaux (à traiter en premier)
+    "aujourd'hui": 'oʒuʁdɥi',
+    "aujourd hui": 'oʒuʁdɥi',
+    "aujourdhui": 'oʒuʁdɥi',
+    "université": 'ynivɛʁsite',
+    
+    # Voyelles composées (à traiter ensuite)
     'eau': 'o',
     'eaux': 'o',
     'au': 'o',
@@ -101,9 +124,16 @@ PHONEMES = {
     'z$': '',  # z final muet
 }
 
+# Cache pour les transcriptions
+CACHE_TRANSCRIPTIONS = {}
+
 def transcrire(texte):
     """Transcrit le texte en phonèmes avec une logique améliorée"""
     texte = texte.lower()
+    
+    # Vérifier d'abord les cas spéciaux
+    if texte in ["aujourd'hui", "aujourd hui", "aujourdhui", "université"]:
+        return PHONEMES[texte]
     
     # Prétraitement
     texte = texte.replace('œ', 'oe')  # Normalisation des ligatures
@@ -173,68 +203,130 @@ def transcrire_avec_phonetisaurus(texte):
             os.unlink(input_file)
 
 def obtenir_prononciation_wiktionary(mot):
-    """Obtient la prononciation depuis l'API de Wiktionary"""
+    """Obtient la prononciation depuis Wiktionnaire sans modifier le mot"""
+    print(f"\n[WIKTIONNAIRE] Recherche de la prononciation pour '{mot}'")
     try:
-        print(f"Tentative d'obtention de la prononciation pour le mot : {mot}")
-        # Utiliser l'API MediaWiki de Wiktionary
-        url = "https://fr.wiktionary.org/w/api.php"
-        params = {
-            'action': 'query',
-            'format': 'json',
-            'prop': 'extracts',
-            'titles': mot,
-            'explaintext': True,
-            'formatversion': 2
+        S = requests.Session()
+        URL = "https://fr.wiktionary.org/w/api.php"
+        PARAMS = {
+            "action": "query",
+            "format": "json",
+            "titles": mot,
+            "prop": "revisions",
+            "rvprop": "content",
+            "rvslots": "main",
+            "redirects": True
         }
-        print(f"Appel API avec paramètres : {params}")
         
-        response = requests.get(url, params=params, timeout=30)
-        print(f"Code de réponse : {response.status_code}")
+        print(f"[WIKTIONNAIRE] URL: {URL}")
+        print(f"[WIKTIONNAIRE] Paramètres: {PARAMS}")
         
-        if response.status_code == 200:
-            data = response.json()
-            print(f"Données reçues : {data}")
+        R = S.get(url=URL, params=PARAMS)
+        print(f"[WIKTIONNAIRE] Status code: {R.status_code}")
+        
+        if R.status_code != 200:
+            print(f"[WIKTIONNAIRE] Erreur HTTP: {R.text}")
+            return None
             
-            # Extraire la prononciation du contenu
-            if 'query' in data and 'pages' in data['query']:
-                for page in data['query']['pages']:
-                    if 'extract' in page:
-                        extract = page['extract']
-                        # Chercher la prononciation IPA
-                        match = re.search(r'\\(.*?\\)', extract)
+        DATA = R.json()
+        
+        if 'query' in DATA and 'pages' in DATA['query']:
+            pages = DATA['query']['pages']
+            for page_id in pages:
+                if str(page_id).startswith('-'):  # Page n'existe pas
+                    print(f"[WIKTIONNAIRE] Page non trouvée pour '{mot}'")
+                    return None
+                    
+                page = pages[page_id]
+                if 'revisions' in page and page['revisions']:
+                    revision = page['revisions'][0]
+                    if '*' in revision['slots']['main']:
+                        contenu = revision['slots']['main']['*']
+                        print(f"\n[WIKTIONNAIRE] Contenu reçu (premiers 500 caractères):")
+                        print("=" * 80)
+                        print(contenu[:500])
+                        print("=" * 80)
+                        
+                        # Chercher la prononciation dans le contenu
+                        # Format typique : {{pron|fr|sɛ}}
+                        match = re.search(r'\{\{pron\|fr\|([^}|]+)}}', contenu)
                         if match:
                             prononciation = match.group(1)
-                            print(f"Prononciation trouvée : {prononciation}")
+                            print(f"[WIKTIONNAIRE] ✓ Prononciation trouvée: {prononciation}")
                             return prononciation
-            
-            print("Aucune prononciation trouvée dans les données")
+                            
+        print(f"[WIKTIONNAIRE] ✗ Aucune prononciation trouvée pour '{mot}'")
         return None
     except Exception as e:
-        print(f"Erreur détaillée lors de l'appel API : {str(e)}")
+        print(f"[WIKTIONNAIRE] Erreur: {str(e)}")
+        return None
+
+def obtenir_prononciation_sphinx(mot):
+    """
+    Obtient la prononciation d'un mot en utilisant PocketSphinx
+    """
+    try:
+        # Initialiser PocketSphinx avec le modèle français
+        ps = Pocketsphinx(
+            lang="fr-FR",
+            verbose=False,
+            logfn=None
+        )
+        
+        # Obtenir la transcription phonétique
+        result = ps.phonemes(mot)
+        
+        # Nettoyer et formater la sortie
+        if result:
+            # Supprimer les espaces superflus et convertir en format IPA
+            phones = result.strip().split()
+            # Conversion basique des phonèmes CMU en IPA
+            cmu_to_ipa = {
+                'AA': 'ɑ', 'AE': 'æ', 'AH': 'ʌ', 'AO': 'ɔ', 'AW': 'aʊ',
+                'AY': 'aɪ', 'B': 'b', 'CH': 'tʃ', 'D': 'd', 'DH': 'ð',
+                'EH': 'ɛ', 'ER': 'ɝ', 'EY': 'eɪ', 'F': 'f', 'G': 'ɡ',
+                'HH': 'h', 'IH': 'ɪ', 'IY': 'i', 'JH': 'dʒ', 'K': 'k',
+                'L': 'l', 'M': 'm', 'N': 'n', 'NG': 'ŋ', 'OW': 'oʊ',
+                'OY': 'ɔɪ', 'P': 'p', 'R': 'ɹ', 'S': 's', 'SH': 'ʃ',
+                'T': 't', 'TH': 'θ', 'UH': 'ʊ', 'UW': 'u', 'V': 'v',
+                'W': 'w', 'Y': 'j', 'Z': 'z', 'ZH': 'ʒ'
+            }
+            
+            ipa = []
+            for phone in phones:
+                # Supprimer les chiffres de stress (0,1,2) s'ils existent
+                base_phone = ''.join([c for c in phone if not c.isdigit()])
+                if base_phone in cmu_to_ipa:
+                    ipa.append(cmu_to_ipa[base_phone])
+                else:
+                    ipa.append(base_phone)
+            
+            return ''.join(ipa)
+        return None
+    except Exception as e:
+        print(f"Erreur lors de la transcription avec PocketSphinx : {str(e)}")
         return None
 
 def transcrire_texte(texte):
-    """Transcrit le texte en utilisant Wiktionary ou le système de fallback"""
-    print(f"Transcription du texte : {texte}")
+    """
+    Transcrit un texte en phonétique
+    """
+    # Nettoyer et préparer le texte
+    texte = texte.lower().strip()
     mots = texte.split()
     resultat = []
     
     for mot in mots:
-        print(f"Traitement du mot : {mot}")
-        # Essayer d'abord avec Wiktionary
-        prononciation = obtenir_prononciation_wiktionary(mot.lower())
-        if prononciation:
-            print(f"Prononciation Wiktionary trouvée : {prononciation}")
-            resultat.append(prononciation)
-        else:
-            print(f"Utilisation du système local pour : {mot}")
-            transcription_locale = transcrire(mot)
-            print(f"Transcription locale : {transcription_locale}")
-            resultat.append(transcription_locale)
+        # D'abord essayer avec PocketSphinx
+        prononciation = obtenir_prononciation_sphinx(mot)
+        
+        # Si PocketSphinx échoue, utiliser le système local
+        if not prononciation:
+            prononciation = transcrire(mot)
+            
+        resultat.append(prononciation if prononciation else mot)
     
-    resultat_final = ' '.join(resultat)
-    print(f"Résultat final de la transcription : {resultat_final}")
-    return resultat_final
+    return ' '.join(resultat)
 
 def est_consonne(phoneme):
     """Détermine si un phonème est une consonne"""
@@ -262,6 +354,53 @@ def extraire_phonemes(transcription):
                 phonemes.append(transcription[i])
             i += 1
     return phonemes
+
+def extraire_syllabes(transcription):
+    """Extrait les syllabes d'une transcription phonétique"""
+    # Séparer en mots
+    mots = transcription.split()
+    syllabes = []
+    
+    for mot in mots:
+        phonemes = extraire_phonemes(mot)
+        syllabe_courante = []
+        
+        i = 0
+        while i < len(phonemes):
+            # Si c'est une voyelle
+            if est_voyelle(phonemes[i]):
+                # Ajouter la voyelle à la syllabe courante
+                syllabe_courante.append(phonemes[i])
+                i += 1
+                
+                # Vérifier si une consonne suit
+                if i < len(phonemes) and est_consonne(phonemes[i]):
+                    # Si c'est la dernière consonne du mot, l'ajouter à la syllabe courante
+                    if i == len(phonemes) - 1:
+                        syllabe_courante.append(phonemes[i])
+                        i += 1
+                    # Sinon, vérifier si une voyelle suit
+                    elif i + 1 < len(phonemes) and est_voyelle(phonemes[i + 1]):
+                        # La consonne appartient à la syllabe suivante
+                        break
+                    else:
+                        # La consonne appartient à la syllabe courante
+                        syllabe_courante.append(phonemes[i])
+                        i += 1
+                
+                # Ajouter la syllabe complète à la liste
+                if syllabe_courante:
+                    syllabes.append(''.join(syllabe_courante))
+                    syllabe_courante = []
+            
+            # Si c'est une consonne
+            elif est_consonne(phonemes[i]):
+                # Si c'est la première consonne d'une syllabe
+                if not syllabe_courante:
+                    syllabe_courante.append(phonemes[i])
+                i += 1
+    
+    return syllabes
 
 def grouper_phonemes(transcription):
     """Groupe les phonèmes selon les règles CV avec _ pour les phonèmes isolés"""
@@ -297,41 +436,61 @@ def grouper_phonemes(transcription):
 def accueil():
     return render_template('index.html')
 
-@app.route('/api/transcrire', methods=['POST'])
-def api_transcrire():
-    print("\n=== Nouvelle requête de transcription ===")
+@app.route('/transcrire', methods=['POST'])
+def transcrire_route():
     try:
+        # Vérifier le Content-Type
+        if not request.is_json:
+            print("[ERREUR] Content-Type incorrect")
+            return jsonify({'error': 'Content-Type doit être application/json'}), 415
+            
         data = request.get_json()
-        print(f"Données reçues : {data}")
-        
-        if not data or 'texte' not in data:
-            print("Erreur: Aucun texte fourni")
-            return jsonify({'error': 'Aucun texte fourni'}), 400
+        if not data:
+            print("[ERREUR] Corps de requête vide")
+            return jsonify({'error': 'Corps de requête vide'}), 400
+            
+        if 'texte' not in data:
+            print("[ERREUR] Champ 'texte' manquant")
+            return jsonify({'error': "Le champ 'texte' est requis"}), 400
             
         texte = data['texte']
-        print(f"Texte à transcrire : {texte}")
+        if not isinstance(texte, str):
+            print("[ERREUR] Le champ 'texte' doit être une chaîne")
+            return jsonify({'error': "Le champ 'texte' doit être une chaîne de caractères"}), 400
+            
+        if not texte.strip():
+            print("[ERREUR] Texte vide")
+            return jsonify({'error': 'Le texte ne peut pas être vide'}), 400
+            
+        print(f"\n[REQUÊTE] Nouvelle requête de transcription reçue: '{texte}'")
         
-        # Transcription directe
         transcription = transcrire_texte(texte)
-        print(f"Transcription obtenue : {transcription}")
-        
-        # Groupement des phonèmes
-        paires = grouper_phonemes(transcription)
-        print(f"Paires obtenues : {paires}")
-        
-        # Préparation de la réponse
+        if not transcription:
+            print("[ERREUR] Échec de la transcription")
+            return jsonify({'error': 'Échec de la transcription'}), 500
+            
         reponse = {
             'transcription': transcription,
-            'paires': paires
+            'texte_original': texte
         }
-        print(f"Réponse complète : {reponse}")
-        
+        print(f"[RÉPONSE] Envoi de la réponse: {reponse}")
         return jsonify(reponse)
         
+    except json.JSONDecodeError:
+        print("[ERREUR] JSON invalide")
+        return jsonify({'error': 'JSON invalide'}), 400
     except Exception as e:
-        print(f"Erreur lors de la transcription : {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        print(f"[ERREUR] Erreur inattendue lors du traitement: {str(e)}")
+        return jsonify({'error': 'Erreur interne du serveur'}), 500
 
 if __name__ == '__main__':
+    # Configuration du logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    
+    # Configuration du serveur
     port = int(os.environ.get("PORT", 5000))
+    app.debug = True
     app.run(host='0.0.0.0', port=port) 
