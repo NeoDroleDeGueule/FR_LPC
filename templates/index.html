@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transcription Phonétique</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        }
+        .result-box {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .phonetic {
+            font-family: 'Arial Unicode MS', 'Lucida Sans Unicode', sans-serif;
+            color: #2c3e50;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4 text-center">Transcription Phonétique</h1>
+        
+        <div class="card">
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="texte" class="form-label">Texte à transcrire :</label>
+                    <textarea id="texte" class="form-control" rows="5" placeholder="Entrez votre texte ici..."></textarea>
+                </div>
+                <div class="d-grid gap-2">
+                    <button onclick="transcrire()" class="btn btn-primary">Transcrire</button>
+                </div>
+                <div id="resultat-direct" class="result-box phonetic d-none"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function transcrire() {
+            const texte = document.getElementById('texte').value;
+            const resultat = document.getElementById('resultat-direct');
+            
+            if (!texte.trim()) {
+                resultat.textContent = "Veuillez entrer du texte à transcrire";
+                resultat.classList.remove('d-none');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/transcrire', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ texte })
+                });
+                const data = await response.json();
+                
+                resultat.textContent = data.transcription;
+                resultat.classList.remove('d-none');
+            } catch (error) {
+                resultat.textContent = `Erreur: ${error.message}`;
+                resultat.classList.remove('d-none');
+            }
+        }
+
+        // Ajouter la possibilité de transcrire en appuyant sur Entrée
+        document.getElementById('texte').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                transcrire();
+            }
+        });
+    </script>
+</body>
+</html> 

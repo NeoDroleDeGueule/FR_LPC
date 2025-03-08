@@ -1,0 +1,9 @@
+{
+    "@metadata": {
+        "authors": [
+            "Votre Nom"
+        ]
+    },
+    "phonetictranscription-desc": "Ajoute la fonction de transcription phonétique au wiki",
+    "phonetictranscription-error": "Erreur lors de la transcription phonétique : $1"
+} 

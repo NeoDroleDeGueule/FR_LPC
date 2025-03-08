@@ -1,0 +1,36 @@
+{
+    "name": "PhoneticTranscription",
+    "version": "1.0.0",
+    "author": [
+        "Votre Nom"
+    ],
+    "url": "https://www.mediawiki.org/wiki/Extension:PhoneticTranscription",
+    "descriptionmsg": "phonetictranscription-desc",
+    "license-name": "GPL-2.0-or-later",
+    "type": "parserhook",
+    "requires": {
+        "MediaWiki": ">= 1.35.0"
+    },
+    "MessagesDirs": {
+        "PhoneticTranscription": [
+            "i18n"
+        ]
+    },
+    "AutoloadClasses": {
+        "PhoneticTranscription": "includes/PhoneticTranscription.php"
+    },
+    "Hooks": {
+        "ParserFirstCallInit": "PhoneticTranscription::onParserFirstCallInit"
+    },
+    "config": {
+        "PhoneticTranscriptionSettings": {
+            "value": {
+                "language": "fr",
+                "defaultEngine": "espeak",
+                "preservePunctuation": true,
+                "useIPA": true
+            }
+        }
+    },
+    "manifest_version": 2
+} 

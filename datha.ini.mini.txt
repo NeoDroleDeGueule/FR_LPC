@@ -1,0 +1,298 @@
+;
+; DATHA.INI
+; (C) DATHA 2000-2003
+; Configuration file for DathaTTVS 1.0
+;
+
+; -------------------------------------------------------------------------------------------------------
+
+;
+; General settings
+;
+[GENERAL]
+VERSION		=	1.0							; Version (!)
+SPLASH		=	YES							; Display Splash Screen ?
+
+; -------------------------------------------------------------------------------------------------------
+
+[DIRECTORIES]
+;
+; Directories
+; Values defined here can be used as variables if used between %%
+;
+
+; Datha Settings
+;ROOT			=	c:\DathaTTVS
+ROOT			=	#INSTALLDIR#\..				; DathaTTVS Installation Folder
+TEMP			=	%ROOT%\TEMP						; Datha temp folder
+LIB				=	%ROOT%\LIB						; Lib from datha
+BIN				=	%ROOT%\BIN						; Lib from datha
+POSES			=	%ROOT%\BIBLIOTHEQUES			; Poses Root dir
+FACES			=	%POSES%\VISAGES					; Faces Root dir
+PHONEMS			=	%FACES%\Phonemes Fr				; Phonems
+VOYELLES		=	%FACES%\Voyelles Fr				; vowels
+POSTURES		=	%FACES%\Postures Fr				; poses
+BRAS			=	%POSES%\Poses\LPC BRAS			; Arm
+MAINS			=	%POSES%\Poses\LPC MAINS			; Hand
+TEMPLATE		=	%LIB%\template.pz3				; template
+
+; General
+PROGRAMFILES=#PROGRAMFILES#					; Default Program Files
+
+; Euler
+EULERDIR=%PROGRAMFILES%\EULER				; Installation Folder For EULER
+EULERINI=%LIB%\euler.ini
+
+; Mbrola
+MBROLADIR=%PROGRAMFILES%\Mbrola Tools		; Installation Folder For MBROLA
+VOICESDIR=									; Alternate folder for MBROLA voices
+
+; Poser
+POSERDIR=%PROGRAMFILES%\Curious Lab\Poser 5
+
+; -------------------------------------------------------------------------------------------------------
+
+;
+; MBROLA PARAMETERS
+;
+[MBROLA]
+; Basic command line (leave comment at the end to avoid removal of '"' by windows (!!)
+CMDLINE	=	"%MBROLADIR%\mbrola.exe"		; Leave This Comment !!!
+
+[MBROLAVOICES]
+;
+; List of voices (available in GUI)
+; Syntax:	GUI NAME	= Command Line Options, id, command line options 2
+;
+Thierry (fr1)		=	-speaker "Thierry_(fr1)",		fr1,	-v 1 -l 16000 -f 1
+Vincent (fr3)		=	-speaker "Vincent_(fr3)",		fr3,	-v 1 -l 16000 -f 1
+Anne-Carole (fr4)	=	-speaker "Anne-Carole_(fr4)",	fr4,	-v 1 -l 22050 -f 2
+
+; -------------------------------------------------------------------------------------------------------
+
+;
+; EULER PARAMETERS
+;
+[EULER]
+; cmdeuler -durationRatio <lenteur> -iniFile euler.ini -phoFileOut %FILE_EULER% -textFile tempfile
+; Basic command line (leave comment at the end to avoid removal of '"' by windows (!!)
+CMDLINE	=	"%EULERDIR%\cmdeuler.exe" -iniFile "%EULERINI%"			; Leave This Comment !!!
+
+; -------------------------------------------------------------------------------------------------------
+
+;
+; Main application (not GUI) parameters
+;
+[DATHA]
+PHONEMS	=	%LIB%\Class-phon.csv			; Phonems File
+
+; -------------------------------------------------------------------------------------------------------
+
+;
+; Lists the converters from LPC file to other formats
+;
+[CONVERTERS]
+TalkingHead	=	no file needed (*.*),txt,%TEMP%\no file needed,"%BIN%\testnet.exe" "#LPCFILE#" "#WAVFILE#" localhost 2003
+Poser	=	Fichiers Poser (*.pz3),pz3,%TEMP%\initPoser.pz3,"%BIN%\lpc2poser.exe" "#LPCFILE#" "#OUTFILE#" PZR "#WAVFILE#" "%PHONEMS%" "%POSTURES%" "%VOYELLES%" "%BRAS%" "%MAINS%" "%TEMPLATE%"
+CSV		=	Fichier Excel (*.csv),csv,%TEMP%\initCSV.csv,"%BIN%\lpc2poser.exe" "#LPCFILE#" "#OUTFILE#" CSV DUMB "%PHONEMS%" "%POSTURES%" "%VOYELLES%" "%BRAS%" "%MAINS%"
+
+; -------------------------------------------------------------------------------------------------------
+
+;
+; DEFAULT VALUES FOR GUI
+;
+[DEFAULT]
+
+; Lenteur by default
+LENTEUR		=	2.0
+
+; Default text to articulate
+TEXTE		=	Bonjour, je m'appelle Anne-Carole.
+
+; Default file names
+FILE_EULER	=	%TEMP%\init.pho
+FILE_MBROLA	=	%TEMP%\init.wav
+FILE_LPC	=	%TEMP%\init.lpc
+
+EXECUTE_EULER	=	NO				;	Execute Euler by default
+EXECUTE_MBROLA	=	NO				;	Execute Mbrola by default
+PLAY_WAV		=	YES				;	Play Sound
+EXECUTE_LPC		=	YES				;	Execute LPC by default
+EXECUTE_OUTPUT	=	NO				;	Execute Conversion by default
+EXECUTE_MAIN	=	YES				;	Generates Hand and Arm
+EXECUTE_PHONEMES=	NO				;	Uses phonems for generation
+EXECUTE_INTERP	=	YES				;	Interpolates Arm and Hand
+
+VERIFY			=	NO				;	Force verification of file existence (see below)
+
+; -------------------------------------------------------------------------------------------------------
+
+;	All files listed in this section are checked before program displays UI
+;	Alternate Message is proposed
+;	Keys must be in the following format:
+;		key=filepath,smartmsg
+;	where
+;		key is not important
+;		filepath is the full path to the file (%aliases% allowed)
+;		smartmsg is the hint given to the user if the file is missing (e.g. Reinstall Application xxx)
+[CHECK_FILES]
+; Verify MBROLA install
+MBROLIEXE		=	%MBROLADIR%\mbroli.exe,Installer Mbrola.
+MBROLAEXE		=	%MBROLADIR%\mbrola.exe,Installer Mbrola Cygwin.
+MBROLADLL		=	%MBROLADIR%\cygwin1.dll,Installer Cygwin1.dll dans le répertoire de MBrola.
+
+; Verify Euler install
+EULEREXE		=	%EULERDIR%\wineuler.exe,Installer Euler.
+
+; Verify PoserConverter install
+POSERCVT		=	%BIN%\lpc2poser.exe,Réinstaller DathaTTVS.
+
+; Verify CSVConverter install
+POSERCVT		=	%BIN%\lpc2csv.exe,Réinstaller DathaTTVS.
+
+; Verify 3D Files
+
+; Verify Graphical Files
+
+
+;	
+; Rewriting rules for LPC
+; syntax:
+;	OLD = NEW
+;
+;	/ : nothing
+;	#n : any vowel (gets the 'n' id if specified)
+;	$n : any conson (gets the 'n' id if specified)
+;	.n : any phonem (gets the 'n' id if specified)
+;	.-{x y ... z} : any phonem but any of the one between { }
+;	() : current phonem
+;   x  : phonem x
+;   x=yyy ; change duration to yyy
+;   Note: these rules are made for insertion in a flow
+
+[RULES]
+
+; header
+/ (.)		=	/ _ * - (.)
+
+; footer
+(.) /		=	(.) _ * - /
+
+; 
+; REGLES DE COARTICULATION
+;
+
+;(_)		=	(_) § !+			; règle spécifique position neutre
+;(!)		=	(!)+				; (!)fausse voyelle 2 ; (§)fausse consonne 2
+
+
+#1 (b) s t #2	=	#1 [(b),#1] - [s,#2] - [t,#2] #2; règle spécifique ; triple consonne ; basée sur le mot Obstacle 
+
+#1 (b) @ _	=	#1 [(b),#1] @ _+		; règle spécifique ; (b),(p),(m) en fin de mot ; ajout d'un (@) si manquant ; (@) non déformé ;
+#1 (p) @ _	=	#1 [(p),#1] @ _+
+#1 (m) @ _	=	#1 [(m),#1] @ _+
+#1 (b) _	=	#1 [(b),#1] @ _+
+#1 (p) _	=	#1 [(p),#1] @ _+
+#1 (m) _	=	#1 [(m),#1] @ _+
+
+(H)       	=       - (H)				; règle spécifique ; correction de l'attribut "consonne"
+(w)		=       - (w)
+(j)		=       - (j)
+
+
+H ($) $1 @ _	=	H [($),1] - [$1,1] @ _+		; règle spécifique (H); double consonne entre (H) et un @
+H ($) $1 #2	=	H [($),1] - [$1,#2] #2+		; règle spécifique (H); double consonne ; 1ere consonne déformée par voyelle (H) ; 2eme consonne déformée par voyelle suivante
+_ ($) $1 H	=	_ [($),1] - [$1,1] H+		; règle spécifique (H); double consonne en début de mot ; 1ere consonne et 2eme consonne déformée par (H) suivante
+H ($) $1 -	=	H [($),1] - [$1,#] -+		; règle spécifique (H); double consonne en fin de mot ; 1ere consonne et 2eme consonne déformée par (H) précédente
+
+w ($) $1 @ _	=	w [($),1] - [$1,1] @ _+		; règle spécifique (w); double consonne entre (w) et un @
+w ($) $1 #2	=	w [($),1] - [$1,#2] #2+		; règle spécifique (w); double consonne ; 1ere consonne déformée par voyelle (w) ; 2eme consonne déformée par voyelle suivante
+_ ($) $1 w	=	_ [($),1] - [$1,1] w+		; règle spécifique (w); double consonne en début de mot ; 1ere consonne et 2eme consonne déformée par (w) suivante
+w ($) $1 -	=	w [($),1] - [$1,#] -+		; règle spécifique (w); double consonne en fin de mot ; 1ere consonne et 2eme consonne déformée par (w) précédente
+
+j ($) $1 @ _	=	j [($),4] - [$1,#] @ _+		; règle spécifique (j); double consonne entre (j) et un @
+j ($) $1 #2	=	j [($),4] - [$1,#2] #2+		; règle spécifique (j); double consonne ; 1ere consonne déformée par voyelle (j) ; 2eme consonne déformée par voyelle suivante
+_ ($) $1 j	=	_ [($),4] - [$1,4] j+		; règle spécifique (j); double consonne en début de mot ; 1ere consonne et 2eme consonne déformée par (j) suivante
+j ($) $1 -	=	j [($),4] - [$1,#] -+		; règle spécifique (j); double consonne en fin de mot ; 1ere consonne et 2eme consonne déformée par (j) précédente
+
+;(l) H		=	[(l),1] H+			; règle spécifique ; prend en compte le (l) avec les semi-consonnes
+;H l ($)		=	H [l,1] _ ($)+
+;H (l)		=	H [(l),1]
+
+;(l) w		=	[(l),1] w+
+;w l ($)		=	w [l,1] _ ($)+
+;w (l)		=	w [(l),1]
+
+;(l) j		=	[(l),4] j+
+;j l ($)		=	j [l,4] _ ($)+
+;j (l)		=	j [(l),4]
+
+
+;(l) _		=	(l) - _+			; règle spécifique ; corrige le bug du (l) non glissé
+;(l) #		=	[(l),#] #+			; règles spécifiques ; prend en compte le (l)
+;# l ($)		=	# [l,#] _ ($)+
+;# (l)		=	# [(l),#]
+;($) l #1	=	[($),#1] - [l,#1] #1+		
+
+($) H		=	[($),1] H+			; règle de base (H) ; consonne déformée par (H) suivante
+H ($) _		=	H [($),1] _+			; règle de base (H) ; consonne en fin de mot déformée par (H) précédente
+H ($)		=	H [($),1]
+
+($) w		=	[($),1] w+			; règle de base (w) ; consonne déformée par (w) suivante
+w ($) _		=	w [($),1] _+			; règle de base (w) ; consonne en fin de mot déformée par (w) précédente
+w ($)		=	w [($),1]
+
+($) j		=	[($),4] j+			; règle de base (j) ; consonne déformée par (j) suivante
+j ($) _		=	j [($),4] _+			; règle de base (j) ; consonne en fin de mot déformée par (j) précédente
+j ($)		=	j [($),4]
+
+
+# ($) $1 @ _	=	# [($),#] - [$1,#] @ _+		; règle spécifique ; double consonne entre une voyelle et un @
+#1 ($) $1 #2	=	#1 [($),#1] - [$1,#2] #2+	; règle de base ; double consonne ; 1ere consonne déformée par voyelle précédente ; 2eme consonne déformée par voyelle suivante
+_ ($) $1 #	=	_ [($),#] - [$1,#] #+		; règle de base ; double consonne en début de mot ; 1ere consonne et 2eme consonne déformée par voyelle suivante
+# ($) $1 -	=	# [($),#] - [$1,#] -+		; règle de base ; double consonne en fin de mot ; 1ere consonne et 2eme consonne déformée par voyelle précédente
+
+;* (#) $	=	* (#)+ $			; règle de base ; voyelle suivie d'une consonne en début de fichier
+;* (#) #1	=	* (#) * #+			; règle de base ; voyelle suivie d'une voyelle en début de fichier
+;* - ($) $2 #1	=	* - [($),#1] - [$2,#1] #1+	; règle de base ; double consonne suivie d'une voyelle en début de fichier
+;($) $2 #1	=	[($),#1] - [$2,#1] #1+		; règle de base ; double consonne suivie d'une voyelle
+
+($) #		=	[($),#] #+			; règle de base ; consonne déformée par voyelle suivante
+# ($) _		=	# [($),#] _+			; règle de base ; consonne en fin de mot déformée par voyelle précédente
+# ($)		=	# [($),#]
+
+
+
+
+
+; insert muted e between consons
+/ ($)		=	/ - ($)				; insert muted e if first is conson
+$1 ($)		=	$1 - ($)			; insert muted e between consons
+$1 (_)		=	$1 - (_)			; insert muted e between consons
+
+; insert pseudo conson between vowels
+/ (#)		=	/ * (#)				; insert pseudo conson if first is vowel
+#1 (#)		=	#1 * (#)			; insert pseudo conson between vowels
+
+
+
+; default
+(.)			=	(.)					; copy the phonem in the list
+
+; default
+(.)			=	(.)					; copy the phonem in the list
+
+
+
+
+[RULES2]
+
+
+
+
+; default
+(.)			=	(.)					; copy the phonem in the list
+
+
+
+
